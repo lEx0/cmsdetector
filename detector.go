@@ -22,13 +22,9 @@ var (
 	PKCS12OID = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 12, 10, 1}
 )
 
-// Kazakhstan-specific signature for NCA keys
-var kazakhstanSignature = []byte{0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01}
-
 // Additional type constants for formats that can't be detected via OID
 const (
 	TypeEncryptedPKCS12 = "Encrypted PKCS#12"
-	TypeNCAKeyPKCS12    = "NCA PKCS#12 Key"
 )
 
 // ContentInfo provides the ASN.1 structure for the main CMS/PKCS container
@@ -87,11 +83,6 @@ func Detect(data []byte) (DetectionResult, error) {
 			IsEncrypted: true,
 		}
 
-		// Check if it's an NCA key
-		if isNCAKey(data) {
-			result.Type = TypeNCAKeyPKCS12
-		}
-
 		return result, nil
 	}
 
@@ -148,27 +139,6 @@ func isEncryptedPKCS12(data []byte) bool {
 	return versionFound && len(data) > 100 && len(data) < 100000
 }
 
-// isNCAKey checks if the data appears to be an NCA/KalkanCrypt key
-func isNCAKey(data []byte) bool {
-	// Look for Kazakhstan's GOST indicators
-	// (these strings often appear in NCA key containers)
-	if bytes.Contains(data, []byte("GOST")) ||
-		bytes.Contains(data, []byte("ГОСТ")) {
-		return true
-	}
-
-	// Check for KalkanCrypt specific patterns
-	if bytes.Contains(data, []byte("Kalkan")) ||
-		bytes.Contains(data, []byte("kalkan")) ||
-		bytes.Contains(data, []byte("KALKAN")) ||
-		bytes.Contains(data, []byte("Калкан")) {
-		return true
-	}
-
-	// Check for Kazakhstan OIDs or other specific signatures
-	return bytes.Contains(data, kazakhstanSignature)
-}
-
 // IsPKCS7Data checks if the data is PKCS#7 data
 func IsPKCS7Data(data []byte) bool {
 	result, err := Detect(data)
@@ -212,8 +182,7 @@ func IsPKCS12(data []byte) bool {
 
 	// Check for both regular and encrypted PKCS#12 containers
 	return result.ContentType.Equal(PKCS12OID) ||
-		result.Type == TypeEncryptedPKCS12 ||
-		result.Type == TypeNCAKeyPKCS12
+		result.Type == TypeEncryptedPKCS12
 }
 
 // IsUserKeyPKCS12 checks if the data appears to be a user PKCS#12 key container
@@ -225,18 +194,7 @@ func IsUserKeyPKCS12(data []byte) bool {
 
 	// Check for both regular and encrypted PKCS#12 containers
 	return result.ContentType.Equal(PKCS12OID) ||
-		result.Type == TypeEncryptedPKCS12 ||
-		result.Type == TypeNCAKeyPKCS12
-}
-
-// IsNCAKeyPKCS12 checks if the data appears to be an NCA PKCS#12 key container
-func IsNCAKeyPKCS12(data []byte) bool {
-	result, err := Detect(data)
-	if err != nil {
-		return false
-	}
-
-	return result.Type == TypeNCAKeyPKCS12
+		result.Type == TypeEncryptedPKCS12
 }
 
 // GetOIDDescription returns a human-readable description of the OID

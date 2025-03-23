@@ -26,7 +26,7 @@ func createTestData(t *testing.T, oid asn1.ObjectIdentifier) []byte {
 }
 
 // createMockPKCS12Key creates a mock encrypted PKCS#12 key for testing
-func createMockPKCS12Key(t *testing.T, includeNCAMarkers bool) []byte {
+func createMockPKCS12Key(t *testing.T) []byte {
 	// Basic PKCS#12 header with version 3
 	header := []byte{
 		0x30, 0x82, 0x01, 0x00, // SEQUENCE tag with length
@@ -46,12 +46,6 @@ func createMockPKCS12Key(t *testing.T, includeNCAMarkers bool) []byte {
 
 	// Add a "KEY" marker
 	content = append(content, []byte("KEY")...)
-
-	// If requested, add NCA markers
-	if includeNCAMarkers {
-		content = append(content, []byte("GOST")...)
-		content = append(content, []byte("Kalkan")...)
-	}
 
 	// Combine all parts
 	result := append(header, content...)
@@ -136,7 +130,7 @@ func TestDetect(t *testing.T) {
 // TestEncryptedPKCS12Detection tests detection of encrypted PKCS#12 containers
 func TestEncryptedPKCS12Detection(t *testing.T) {
 	// Create a mock encrypted PKCS#12 container
-	mockP12 := createMockPKCS12Key(t, false)
+	mockP12 := createMockPKCS12Key(t)
 
 	// Test detection
 	result, err := Detect(mockP12)
@@ -161,32 +155,6 @@ func TestEncryptedPKCS12Detection(t *testing.T) {
 	// Check if IsUserKeyPKCS12 correctly identifies it
 	if !IsUserKeyPKCS12(mockP12) {
 		t.Errorf("IsUserKeyPKCS12 failed to detect encrypted PKCS#12")
-	}
-}
-
-// TestNCAKeyDetection tests detection of NCA key containers
-func TestNCAKeyDetection(t *testing.T) {
-	// Create a mock NCA PKCS#12 container
-	mockNCAP12 := createMockPKCS12Key(t, true)
-
-	// Test detection
-	result, err := Detect(mockNCAP12)
-	if err != nil {
-		t.Fatalf("Detect returned an error for NCA PKCS#12: %v", err)
-	}
-
-	// Check if it's detected as NCA PKCS#12
-	if result.Type != TypeNCAKeyPKCS12 {
-		t.Errorf("Expected type %s, got %s", TypeNCAKeyPKCS12, result.Type)
-	}
-
-	if !result.IsEncrypted {
-		t.Errorf("Expected IsEncrypted to be true")
-	}
-
-	// Check if IsNCAKeyPKCS12 correctly identifies it
-	if !IsNCAKeyPKCS12(mockNCAP12) {
-		t.Errorf("IsNCAKeyPKCS12 failed to detect NCA PKCS#12")
 	}
 }
 
@@ -291,10 +259,6 @@ func TestInvalidData(t *testing.T) {
 
 	if IsUserKeyPKCS12(invalidData) {
 		t.Error("IsUserKeyPKCS12 should return false for invalid data")
-	}
-
-	if IsNCAKeyPKCS12(invalidData) {
-		t.Error("IsNCAKeyPKCS12 should return false for invalid data")
 	}
 }
 

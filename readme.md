@@ -18,8 +18,7 @@ go get github.com/lEx0/cmsdetector
   - PKCS#7 Digested Data
   - PKCS#7 Encrypted Data
 - Basic verification of PKCS#12 containers
-- User key detection for PKCS#12 containers (including encrypted keys)
-- Specialized detection for personal key containers from the National Certification Authority of Republic of Kazakhstan (NCA - https://pki.gov.kz/en/)
+- User key detection for PKCS#12 containers (including encrypted keys and NCA user keys)
 - Extraction of CMS structure metadata
 - Compatibility with KalkanCrypt (Kazakhstan's national cryptographic provider) formats and standards
 
@@ -85,11 +84,6 @@ if cmsdetector.IsPKCS12(data) {
 if cmsdetector.IsUserKeyPKCS12(data) {
     fmt.Println("Found user PKCS#12 key container")
 }
-
-// Check for NCA key container
-if cmsdetector.IsNCAKeyPKCS12(data) {
-    fmt.Println("Found NCA (Kazakhstan) key container")
-}
 ```
 
 ## Detecting Encrypted PKCS#12 Keys
@@ -112,11 +106,6 @@ if err == nil {
     if result.IsEncrypted {
         fmt.Println("This is an encrypted container")
     }
-    
-    // For NCA keys specifically
-    if result.Type == cmsdetector.TypeNCAKeyPKCS12 {
-        fmt.Println("This appears to be an NCA/KalkanCrypt key")
-    }
 }
 ```
 
@@ -133,7 +122,6 @@ This library is designed to work with files created by KalkanCrypt, the national
 - CMS/PKCS#7 signed data (digital signatures)
 - PKCS#12 (.p12) key containers
 - Encrypted user key containers (with from National Certification Authority of the Republic of Kazakhstan aka NCA)
-- NCA-specific cryptographic formats
 
 This makes the library particularly useful for applications that need to interoperate with the KalkanCrypt ecosystem and NCA (National Certification Authority) of Kazakhstan.
 
