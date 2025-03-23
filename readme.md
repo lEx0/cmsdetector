@@ -50,7 +50,11 @@ func main() {
 	}
 	
 	fmt.Printf("File type: %s\n", result.Type)
-	fmt.Printf("OID: %s\n", result.ContentType.String())
+	fmt.Printf("Encrypted: %v\n", result.IsEncrypted)
+	
+	if result.ContentType != nil {
+		fmt.Printf("OID: %s\n", result.ContentType.String())
+	}
 	
 	// Check for specific type
 	if cmsdetector.IsPKCS7SignedData(data) {
@@ -90,29 +94,28 @@ if cmsdetector.IsNCAKeyPKCS12(data) {
 
 ## Detecting Encrypted PKCS#12 Keys
 
-The library includes specialized functions to detect encrypted PKCS#12 containers like those used for personal keys:
+The library includes specialized detection for encrypted PKCS#12 containers like those used for personal keys:
 
 ```go
 // Read an encrypted .p12 file
-data, err := os.ReadFile("user.p12")
+data, err := os.ReadFile("GOST512_112233.p12")
 if err != nil {
     fmt.Printf("Error reading file: %s\n", err)
     return
 }
 
-// Standard detection might fail for encrypted files
-_, err = cmsdetector.Detect(data)
-if err != nil {
-    fmt.Println("Standard detection failed, trying specialized key detection...")
+// Detect will now handle encrypted containers
+result, err := cmsdetector.Detect(data)
+if err == nil {
+    fmt.Printf("Detected: %s\n", result.Type)
     
-    // Try user key detection which works without decryption
-    if cmsdetector.IsUserKeyPKCS12(data) {
-        fmt.Println("Detected encrypted PKCS#12 key container")
-        
-        // For NCA keys specifically
-        if cmsdetector.IsNCAKeyPKCS12(data) {
-            fmt.Println("This appears to be an NCA/KalkanCrypt key")
-        }
+    if result.IsEncrypted {
+        fmt.Println("This is an encrypted container")
+    }
+    
+    // For NCA keys specifically
+    if result.Type == cmsdetector.TypeNCAKeyPKCS12 {
+        fmt.Println("This appears to be an NCA/KalkanCrypt key")
     }
 }
 ```
@@ -129,10 +132,10 @@ This library is designed to work with files created by KalkanCrypt, the national
 
 - CMS/PKCS#7 signed data (digital signatures)
 - PKCS#12 (.p12) key containers
-- Encrypted user key containers (from National Certification Authority of the Republic of Kazakhstan aka NCA)
-- Other KalkanCrypt-specific cryptographic formats
+- Encrypted user key containers (with from National Certification Authority of the Republic of Kazakhstan aka NCA)
+- NCA-specific cryptographic formats
 
-This makes the library particularly useful for applications that need to interoperate with the KalkanCrypt ecosystem.
+This makes the library particularly useful for applications that need to interoperate with the KalkanCrypt ecosystem and NCA (National Certification Authority) of Kazakhstan.
 
 ## License
 
