@@ -2,7 +2,6 @@ package cmsdetector
 
 import (
 	"encoding/asn1"
-	"encoding/hex"
 	"testing"
 )
 
@@ -26,61 +25,79 @@ func createTestData(t *testing.T, oid asn1.ObjectIdentifier) []byte {
 	return data
 }
 
+// createMockPKCS12Key creates a mock encrypted PKCS#12 key for testing
+func createMockPKCS12Key(t *testing.T) []byte {
+	// Basic PKCS#12 header with version 3
+	header := []byte{
+		0x30, 0x82, 0x01, 0x00, // SEQUENCE tag with length
+		0x02, 0x01, 0x03, // INTEGER 3 (version)
+		0x30, 0x82, 0x00, 0x50, // SEQUENCE for AuthSafe
+	}
+
+	// Add some mock content
+	content := []byte{
+		// Add padding to satisfy the minimum size check
+		0x04, 0x20, // OCTET STRING with 32 bytes of data
+	}
+	// Add 32 bytes of padding
+	for i := 0; i < 32; i++ {
+		content = append(content, byte(i))
+	}
+
+	// Add a "KEY" marker
+	content = append(content, []byte("KEY")...)
+
+	// Combine all parts
+	result := append(header, content...)
+	return result
+}
+
 // TestDetect tests the Detect function with different CMS types
 func TestDetect(t *testing.T) {
 	tests := []struct {
-		name           string
-		oid            asn1.ObjectIdentifier
-		expectedType   string
-		expectedResult bool
+		name         string
+		oid          asn1.ObjectIdentifier
+		expectedType string
 	}{
 		{
-			name:           "PKCS#7 Data",
-			oid:            PKCS7DataOID,
-			expectedType:   "PKCS#7 Data",
-			expectedResult: true,
+			name:         "PKCS#7 Data",
+			oid:          PKCS7DataOID,
+			expectedType: "PKCS#7 Data",
 		},
 		{
-			name:           "PKCS#7 Signed Data",
-			oid:            PKCS7SignedDataOID,
-			expectedType:   "PKCS#7 Signed Data",
-			expectedResult: true,
+			name:         "PKCS#7 Signed Data",
+			oid:          PKCS7SignedDataOID,
+			expectedType: "PKCS#7 Signed Data",
 		},
 		{
-			name:           "PKCS#7 Enveloped Data",
-			oid:            PKCS7EnvelopedDataOID,
-			expectedType:   "PKCS#7 Enveloped Data",
-			expectedResult: true,
+			name:         "PKCS#7 Enveloped Data",
+			oid:          PKCS7EnvelopedDataOID,
+			expectedType: "PKCS#7 Enveloped Data",
 		},
 		{
-			name:           "PKCS#7 Signed And Enveloped Data",
-			oid:            PKCS7SignedAndEnvelopedOID,
-			expectedType:   "PKCS#7 Signed And Enveloped Data",
-			expectedResult: true,
+			name:         "PKCS#7 Signed And Enveloped Data",
+			oid:          PKCS7SignedAndEnvelopedOID,
+			expectedType: "PKCS#7 Signed And Enveloped Data",
 		},
 		{
-			name:           "PKCS#7 Digested Data",
-			oid:            PKCS7DigestedDataOID,
-			expectedType:   "PKCS#7 Digested Data",
-			expectedResult: true,
+			name:         "PKCS#7 Digested Data",
+			oid:          PKCS7DigestedDataOID,
+			expectedType: "PKCS#7 Digested Data",
 		},
 		{
-			name:           "PKCS#7 Encrypted Data",
-			oid:            PKCS7EncryptedDataOID,
-			expectedType:   "PKCS#7 Encrypted Data",
-			expectedResult: true,
+			name:         "PKCS#7 Encrypted Data",
+			oid:          PKCS7EncryptedDataOID,
+			expectedType: "PKCS#7 Encrypted Data",
 		},
 		{
-			name:           "PKCS#12",
-			oid:            PKCS12OID,
-			expectedType:   "PKCS#12",
-			expectedResult: true,
+			name:         "PKCS#12",
+			oid:          PKCS12OID,
+			expectedType: "PKCS#12",
 		},
 		{
-			name:           "Unknown OID",
-			oid:            asn1.ObjectIdentifier{1, 2, 3, 4, 5},
-			expectedType:   "Unknown OID: 1.2.3.4.5",
-			expectedResult: false,
+			name:         "Unknown OID",
+			oid:          asn1.ObjectIdentifier{1, 2, 3, 4, 5},
+			expectedType: "Unknown OID: 1.2.3.4.5",
 		},
 	}
 
@@ -107,6 +124,37 @@ func TestDetect(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+// TestEncryptedPKCS12Detection tests detection of encrypted PKCS#12 containers
+func TestEncryptedPKCS12Detection(t *testing.T) {
+	// Create a mock encrypted PKCS#12 container
+	mockP12 := createMockPKCS12Key(t)
+
+	// Test detection
+	result, err := Detect(mockP12)
+	if err != nil {
+		t.Fatalf("Detect returned an error for encrypted PKCS#12: %v", err)
+	}
+
+	// Check if it's detected as encrypted PKCS#12
+	if result.Type != TypeEncryptedPKCS12 {
+		t.Errorf("Expected type %s, got %s", TypeEncryptedPKCS12, result.Type)
+	}
+
+	if !result.IsEncrypted {
+		t.Errorf("Expected IsEncrypted to be true")
+	}
+
+	// Check if IsPKCS12 correctly identifies it
+	if !IsPKCS12(mockP12) {
+		t.Errorf("IsPKCS12 failed to detect encrypted PKCS#12")
+	}
+
+	// Check if IsUserKeyPKCS12 correctly identifies it
+	if !IsUserKeyPKCS12(mockP12) {
+		t.Errorf("IsUserKeyPKCS12 failed to detect encrypted PKCS#12")
 	}
 }
 
@@ -208,25 +256,9 @@ func TestInvalidData(t *testing.T) {
 	if IsPKCS12(invalidData) {
 		t.Error("IsPKCS12 should return false for invalid data")
 	}
-}
 
-// TestRealWorldSample tests with a hexadecimal representation of a real-world sample
-func TestRealWorldSample(t *testing.T) {
-	// This is a simplified example of a PKCS#7 SignedData structure
-	// In a real test, this would be a complete PKCS#7 SignedData sample
-	hexData := "308006092a864886f70d010702a080" // Simplified PKCS#7 SignedData header
-
-	data, err := hex.DecodeString(hexData)
-	if err != nil {
-		t.Fatalf("Failed to decode hex: %v", err)
-	}
-
-	// Just testing that we don't panic - the sample is too simplified to actually detect
-	_, err = Detect(data)
-	if err == nil {
-		// This would normally pass with a complete real-world sample
-		// Here we expect an error since our sample is too simplified
-		t.Log("Note: With a complete sample, this shouldn't error")
+	if IsUserKeyPKCS12(invalidData) {
+		t.Error("IsUserKeyPKCS12 should return false for invalid data")
 	}
 }
 
