@@ -11,15 +11,17 @@ go get github.com/lEx0/cmsdetector
 ## Features
 
 - Detection of various PKCS#7 (CMS) structures:
-    - PKCS#7 Data
-    - PKCS#7 Signed Data
-    - PKCS#7 Enveloped Data
-    - PKCS#7 Signed And Enveloped Data
-    - PKCS#7 Digested Data
-    - PKCS#7 Encrypted Data
+  - PKCS#7 Data
+  - PKCS#7 Signed Data
+  - PKCS#7 Enveloped Data
+  - PKCS#7 Signed And Enveloped Data
+  - PKCS#7 Digested Data
+  - PKCS#7 Encrypted Data
 - Basic verification of PKCS#12 containers
+- User key detection for PKCS#12 containers (including encrypted keys)
+- Specialized detection for personal key containers from the National Certification Authority of Republic of Kazakhstan (NCA - https://pki.gov.kz/en/)
 - Extraction of CMS structure metadata
-- Full compatibility with KalkanCrypt (Kazakhstan's national cryptographic provider) formats and standards
+- Compatibility with KalkanCrypt (Kazakhstan's national cryptographic provider) formats and standards
 
 ## Usage Example
 
@@ -74,12 +76,52 @@ if cmsdetector.IsPKCS7EnvelopedData(data) {
 if cmsdetector.IsPKCS12(data) {
     fmt.Println("Found PKCS#12 container")
 }
+
+// Check for user PKCS#12 key container (even encrypted)
+if cmsdetector.IsUserKeyPKCS12(data) {
+    fmt.Println("Found user PKCS#12 key container")
+}
+
+// Check for NCA key container
+if cmsdetector.IsNCAKeyPKCS12(data) {
+    fmt.Println("Found NCA (Kazakhstan) key container")
+}
+```
+
+## Detecting Encrypted PKCS#12 Keys
+
+The library includes specialized functions to detect encrypted PKCS#12 containers like those used for personal keys:
+
+```go
+// Read an encrypted .p12 file
+data, err := os.ReadFile("user.p12")
+if err != nil {
+    fmt.Printf("Error reading file: %s\n", err)
+    return
+}
+
+// Standard detection might fail for encrypted files
+_, err = cmsdetector.Detect(data)
+if err != nil {
+    fmt.Println("Standard detection failed, trying specialized key detection...")
+    
+    // Try user key detection which works without decryption
+    if cmsdetector.IsUserKeyPKCS12(data) {
+        fmt.Println("Detected encrypted PKCS#12 key container")
+        
+        // For NCA keys specifically
+        if cmsdetector.IsNCAKeyPKCS12(data) {
+            fmt.Println("This appears to be an NCA/KalkanCrypt key")
+        }
+    }
+}
 ```
 
 ## Limitations
 
 - The library only performs type detection of CMS/PKCS data, not full parsing or validation
 - For PKCS#12 containers, basic structure verification is performed, but not content decryption
+- The specialized key detection functions use heuristics and may not be 100% accurate for all cases
 
 ## KalkanCrypt Compatibility
 
@@ -87,6 +129,7 @@ This library is designed to work with files created by KalkanCrypt, the national
 
 - CMS/PKCS#7 signed data (digital signatures)
 - PKCS#12 (.p12) key containers
+- Encrypted user key containers (from National Certification Authority of the Republic of Kazakhstan aka NCA)
 - Other KalkanCrypt-specific cryptographic formats
 
 This makes the library particularly useful for applications that need to interoperate with the KalkanCrypt ecosystem.
